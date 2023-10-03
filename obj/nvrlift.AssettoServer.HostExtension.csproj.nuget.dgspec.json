@@ -8,7 +8,7 @@
       "version": "1.0.0",
       "restore": {
         "projectUniqueName": "D:\\Code\\nvrlift\\AssettoServer\\nvrlift.AssettoServer.HostExtension\\nvrlift.AssettoServer.HostExtension.csproj",
-        "projectName": "nvrlift.AssettoServer.HostExtension",
+        "projectName": "AS-Restarter",
         "projectPath": "D:\\Code\\nvrlift\\AssettoServer\\nvrlift.AssettoServer.HostExtension\\nvrlift.AssettoServer.HostExtension.csproj",
         "packagesPath": "C:\\Users\\macn\\.nuget\\packages\\",
         "outputPath": "D:\\Code\\nvrlift\\AssettoServer\\nvrlift.AssettoServer.HostExtension\\obj\\",

@@ -18,16 +18,7 @@ public class RestartWatcher
         _assettoServerPath = Path.Join(_basePath, "AssettoServer.exe");
         _assettoServerArgs = "";
         
-    }
-
-    public void Init()
-    {
-        var initPath = Path.Join(_basePath, "init.asrestart");
-        File.Create(initPath);
-    }
-
-    public void StartWatcher()
-    {
+        // Init File Watcher
         _watcher = new FileSystemWatcher()
         {
             Path = _basePath,
@@ -39,7 +30,13 @@ public class RestartWatcher
         
         _watcher.EnableRaisingEvents = true;
     }
-    
+
+    public void Init()
+    {
+        var initPath = Path.Join(_basePath, "init.asrestart");
+        File.Create(initPath);
+    }
+
     private void OnRestartFileCreated(object source, FileSystemEventArgs e) 
     {
         if (CurrentProcess != null)

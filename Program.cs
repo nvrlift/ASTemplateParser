@@ -7,7 +7,6 @@ internal static class Program
     private static void Main()
     {
         RestartWatcher watcher = new();
-        watcher.StartWatcher();
         
         watcher.Init();
         
