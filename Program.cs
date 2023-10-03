@@ -1,3 +1,19 @@
-﻿// See https://aka.ms/new-console-template for more information
+﻿using System;
 
-Console.WriteLine("Hello, World!");
+namespace nvrlift.AssettoServer.HostExtension;
+
+internal static class Program
+{
+    private static void Main()
+    {
+        RestartWatcher watcher = new();
+        watcher.StartWatcher();
+        
+        watcher.Init();
+        
+        string cancelInput;
+        do {
+            cancelInput = Console.ReadLine() ?? "";                
+        } while (cancelInput != "lift");
+    }
+}
