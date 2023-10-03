@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace nvrlift.AssettoServer.HostExtension;
+﻿namespace nvrlift.AssettoServer.HostExtension;
 
 internal static class Program
 {

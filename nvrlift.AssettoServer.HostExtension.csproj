@@ -6,7 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AssemblyName>AS-Restarter</AssemblyName>
-        <Authors>nvrlift</Authors>
+        <Authors>thisguyStan</Authors>
         <Company>nvrlift</Company>
         <Product>AssettoServer.HostExtension</Product>
     </PropertyGroup>
