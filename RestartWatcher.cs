@@ -31,8 +31,17 @@ public class RestartWatcher
 
     public void Init()
     {
+        Console.WriteLine(_basePath);
+        
+        foreach(string sFile in Directory.GetFiles(_basePath, "*.asrestart"))
+        {
+            File.Delete(sFile);
+        }
+        
         var initPath = Path.Join(_basePath, "init.asrestart");
-        File.Create(initPath);
+        var initFile = File.Create(initPath);
+        initFile.Close();
+        Thread.Sleep(2_000);
     }
 
     private void OnRestartFileCreated(object source, FileSystemEventArgs e) 
@@ -40,18 +49,31 @@ public class RestartWatcher
         if (CurrentProcess != null)
             StopAssettoServer(CurrentProcess);
         
+        Console.WriteLine(CurrentProcess?.Id);
+        Console.WriteLine(e.FullPath);
+        Console.WriteLine("-----");
+        
         File.Delete(e.FullPath);
         CurrentProcess = StartAssettoServer(_assettoServerPath, _assettoServerArgs);
     }
 
-    public Process StartAssettoServer(string assettoServerPath, string assettoServerArgs)
+    private Process StartAssettoServer(string assettoServerPath, string assettoServerArgs)
     {
-        return Process.Start(assettoServerPath, assettoServerArgs);
+        var psi = new ProcessStartInfo(assettoServerPath, assettoServerArgs);
+        psi.UseShellExecute = true;
+        
+        return Process.Start(psi);
     }
     
-    public void StopAssettoServer(Process serverProcess)
+    private void StopAssettoServer(Process serverProcess)
     {
         while(!serverProcess.HasExited)
             serverProcess.Kill();
+    }
+    
+    public void StopAssettoServer()
+    {
+        while(!CurrentProcess!.HasExited)
+            CurrentProcess.Kill();
     }
 }

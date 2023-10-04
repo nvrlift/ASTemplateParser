@@ -8,9 +8,12 @@ internal static class Program
         
         watcher.Init();
         
+        Console.WriteLine("Type 'lift' to close this application.");
         string cancelInput;
         do {
             cancelInput = Console.ReadLine() ?? "";                
         } while (cancelInput != "lift");
+        
+        watcher.StopAssettoServer();
     }
 }
