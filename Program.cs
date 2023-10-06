@@ -5,6 +5,7 @@ internal static class Program
     private static void Main()
     {
         RestartWatcher watcher = new();
+        AppDomain.CurrentDomain.ProcessExit += new EventHandler((sender, e) => ProcessExit(sender, e, watcher));           
         
         watcher.Init();
         
@@ -13,7 +14,10 @@ internal static class Program
         do {
             cancelInput = Console.ReadLine() ?? "";                
         } while (cancelInput != "lift");
-        
+    }
+
+    private static void ProcessExit(object sender, EventArgs e, RestartWatcher watcher)
+    {
         watcher.StopAssettoServer();
     }
 }
