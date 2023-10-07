@@ -20,7 +20,7 @@ public class RestartWatcher
         // Init File Watcher
         _watcher = new FileSystemWatcher()
         {
-            Path = _basePath,
+            Path = Path.Join(_basePath, "cfg", "restart"),
             NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
                                                     | NotifyFilters.FileName,
             Filter = _restartFilter,
