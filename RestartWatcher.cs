@@ -37,7 +37,9 @@ public class RestartWatcher
 
     public void Init()
     {
-        Console.WriteLine(_basePath);
+        ConsoleLog($"Starting restart service.");
+        ConsoleLog($"Base directory: {_basePath}");
+        ConsoleLog($"Restart file directory: {_restartPath}");
         
         foreach (string sFile in Directory.GetFiles(_restartPath, "*.asrestart"))
         {
@@ -55,12 +57,12 @@ public class RestartWatcher
         if (CurrentProcess != null)
             StopAssettoServer(CurrentProcess);
 
-        Console.WriteLine(CurrentProcess?.Id);
-        Console.WriteLine(e.FullPath);
-        Console.WriteLine("-----");
+        ConsoleLog($"Restart file found: {e.Name}");
+        ConsoleLogSpacer();
 
         File.Delete(e.FullPath);
         CurrentProcess = StartAssettoServer(_assettoServerPath, _assettoServerArgs);
+        ConsoleLog($"Server restarted with PID: {CurrentProcess?.Id}");
     }
 
     private Process StartAssettoServer(string assettoServerPath, string assettoServerArgs)
@@ -79,7 +81,23 @@ public class RestartWatcher
 
     public void StopAssettoServer()
     {
-        while (!CurrentProcess!.HasExited)
-            CurrentProcess.Kill();
+        StopAssettoServer(CurrentProcess!);
+    }
+
+    private string ConsoleLogTime()
+    {
+        var date = DateTime.Now;
+        return $"[{date:yyyy-MM-dd hh:mm:ss}]";
+    }
+
+    private void ConsoleLogSpacer()
+    {
+        Console.WriteLine("-----");
+    }
+    
+    private void ConsoleLog(string log)
+    {
+        var output = $"{ConsoleLogTime()} {log}";
+        Console.WriteLine(output);
     }
 }
