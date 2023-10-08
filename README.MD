@@ -1,8 +1,7 @@
-#AS-Restarter.exe
+# AS-Restarter.exe
+This Program will start "AssettoServer.exe" and watch any files with the following filter "*.asrestart" in the folder cfg/restart.
 
-This Program will start "AssettoServer.exe" and watch any files with the following filter "*.asrestart".
-
-When file found, it will restart "AssettoServer.exe"
+When a .asrestart file is found, it will restart "AssettoServer.exe".
 
 # Install and use
 
