@@ -5,6 +5,7 @@ namespace nvrlift.AssettoServer.HostExtension;
 public class RestartWatcher
 {
     private readonly string _basePath;
+    private readonly string _restartPath;
     private readonly string _assettoServerPath;
     private readonly string _assettoServerArgs;
     private readonly string _restartFilter = "*.asrestart";
@@ -14,13 +15,17 @@ public class RestartWatcher
     public RestartWatcher()
     {
         _basePath = Environment.CurrentDirectory;
+        _restartPath = Path.Join(_basePath, "cfg", "restart");
         _assettoServerPath = Path.Join(_basePath, "AssettoServer.exe");
         _assettoServerArgs = "";
 
+        if (!Path.Exists(_restartPath))
+            Directory.CreateDirectory(_restartPath);
+        
         // Init File Watcher
         _watcher = new FileSystemWatcher()
         {
-            Path = Path.Join(_basePath, "cfg", "restart"),
+            Path = Path.Join(_restartPath),
             NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
                                                     | NotifyFilters.FileName,
             Filter = _restartFilter,
@@ -33,13 +38,13 @@ public class RestartWatcher
     public void Init()
     {
         Console.WriteLine(_basePath);
-
-        foreach (string sFile in Directory.GetFiles(_basePath, "*.asrestart"))
+        
+        foreach (string sFile in Directory.GetFiles(_restartPath, "*.asrestart"))
         {
             File.Delete(sFile);
         }
 
-        var initPath = Path.Join(_basePath, "init.asrestart");
+        var initPath = Path.Join(_restartPath, "init.asrestart");
         var initFile = File.Create(initPath);
         initFile.Close();
         Thread.Sleep(2_000);
