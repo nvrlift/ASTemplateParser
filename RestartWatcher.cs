@@ -8,7 +8,6 @@ public class RestartWatcher
     private readonly string _restartPath;
     private readonly string _assettoServerPath;
     private readonly string _restartFilter = "*.asrestart";
-    private readonly FileSystemWatcher _watcher;
     private Process? CurrentProcess = null;
 
     public RestartWatcher()
@@ -20,17 +19,12 @@ public class RestartWatcher
         if (!Path.Exists(_restartPath))
             Directory.CreateDirectory(_restartPath);
         
+        
         // Init File Watcher
-        _watcher = new FileSystemWatcher()
-        {
-            Path = Path.Join(_restartPath),
-            NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
-                                                    | NotifyFilters.FileName,
-            Filter = _restartFilter,
-        };
-        _watcher.Created += new FileSystemEventHandler(OnRestartFileCreated);
-
-        _watcher.EnableRaisingEvents = true;
+        StartWatcher(_restartPath);
+        var presetPath = Path.Join(_basePath, "presets");
+        foreach (var path in Directory.GetDirectories(presetPath))
+            StartWatcher(Path.Join(path, "restart"));
     }
 
     public void Init()
@@ -50,6 +44,20 @@ public class RestartWatcher
         Thread.Sleep(2_000);
     }
 
+    private void StartWatcher(string path)
+    {
+        var watcher = new FileSystemWatcher()
+        {
+            Path = Path.Join(path),
+            NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
+                                                    | NotifyFilters.FileName,
+            Filter = _restartFilter,
+        };
+        watcher.Created += new FileSystemEventHandler(OnRestartFileCreated);
+
+        watcher.EnableRaisingEvents = true;
+    }
+    
     private void OnRestartFileCreated(object source, FileSystemEventArgs e)
     {
         if (CurrentProcess != null)
@@ -64,7 +72,7 @@ public class RestartWatcher
         string args = e.Name.Equals("init.asrestart") ? "" : $"--preset={preset.Trim()}";
         CurrentProcess = StartAssettoServer(_assettoServerPath, args);
         ConsoleLog($"Server restarted with Process-ID: {CurrentProcess?.Id}");
-        ConsoleLog($"Using config preset: {CurrentProcess?.Id}");
+        ConsoleLog($"Using config preset: {preset}");
     }
 
     private Process StartAssettoServer(string assettoServerPath, string assettoServerArgs)
