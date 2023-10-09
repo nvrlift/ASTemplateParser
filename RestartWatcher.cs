@@ -7,9 +7,8 @@ public class RestartWatcher
     private readonly string _basePath;
     private readonly string _restartPath;
     private readonly string _assettoServerPath;
-    private readonly string _assettoServerArgs;
     private readonly string _restartFilter = "*.asrestart";
-    private FileSystemWatcher _watcher;
+    private readonly FileSystemWatcher _watcher;
     private Process? CurrentProcess = null;
 
     public RestartWatcher()
@@ -17,7 +16,6 @@ public class RestartWatcher
         _basePath = Environment.CurrentDirectory;
         _restartPath = Path.Join(_basePath, "cfg", "restart");
         _assettoServerPath = Path.Join(_basePath, "AssettoServer.exe");
-        _assettoServerArgs = "";
 
         if (!Path.Exists(_restartPath))
             Directory.CreateDirectory(_restartPath);
@@ -60,9 +58,13 @@ public class RestartWatcher
         ConsoleLog($"Restart file found: {e.Name}");
         ConsoleLogSpacer();
 
+        string preset = File.ReadAllText(e.FullPath);
+
         File.Delete(e.FullPath);
-        CurrentProcess = StartAssettoServer(_assettoServerPath, _assettoServerArgs);
-        ConsoleLog($"Server restarted with PID: {CurrentProcess?.Id}");
+        string args = e.Name.Equals("init.asrestart") ? "" : $"--preset={preset.Trim()}";
+        CurrentProcess = StartAssettoServer(_assettoServerPath, args);
+        ConsoleLog($"Server restarted with Process-ID: {CurrentProcess?.Id}");
+        ConsoleLog($"Using config preset: {CurrentProcess?.Id}");
     }
 
     private Process StartAssettoServer(string assettoServerPath, string assettoServerArgs)
