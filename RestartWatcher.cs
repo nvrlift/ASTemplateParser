@@ -69,7 +69,7 @@ public class RestartWatcher
         string preset = File.ReadAllText(e.FullPath);
 
         File.Delete(e.FullPath);
-        string args = e.Name.Equals("init.asrestart") ? "" : $"--preset={preset.Trim()}";
+        string args = e.Name.Equals("init.asrestart") ? "" : $"--preset=\"{preset.Trim()}\"";
         CurrentProcess = StartAssettoServer(_assettoServerPath, args);
         ConsoleLog($"Server restarted with Process-ID: {CurrentProcess?.Id}");
         ConsoleLog($"Using config preset: {preset}");
