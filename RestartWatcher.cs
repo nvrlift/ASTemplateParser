@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 
 namespace nvrlift.AssettoServer.HostExtension;
 
@@ -33,15 +34,14 @@ public class RestartWatcher
     {
         ConsoleLog($"Starting restart service.");
         ConsoleLog($"Base directory: {_basePath}");
-        ConsoleLog($"Restart file directory: {_restartPath}");
-        
-        foreach (string sFile in Directory.GetFiles(_restartPath, "*.asrestart"))
-        {
-            File.Delete(sFile);
-        }
 
+        var presets = Directory.GetDirectories(_presetsPath).Select(d => Path.GetFileName(d)).ToList();
+        var randomPreset = presets[Random.Shared.Next(presets.Count)];
+        
         var initPath = Path.Join(_restartPath, "init.asrestart");
         var initFile = File.Create(initPath);
+        byte[] content = new UTF8Encoding(true).GetBytes(randomPreset);
+        initFile.Write(content, 0, content.Length);
         initFile.Close();
         Thread.Sleep(2_000);
     }
@@ -71,7 +71,7 @@ public class RestartWatcher
         string preset = File.ReadAllText(e.FullPath);
 
         File.Delete(e.FullPath);
-        string args = e.Name.Equals("init.asrestart") ? "" : $"--preset=\"{preset.Trim()}\"";
+        string args = $"--preset=\"{preset.Trim()}\"";
         CurrentProcess = StartAssettoServer(_assettoServerPath, args);
         ConsoleLog($"Server restarted with Process-ID: {CurrentProcess?.Id}");
         ConsoleLog($"Using config preset: {preset}");
