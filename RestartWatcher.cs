@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 
 namespace nvrlift.AssettoServer.HostExtension;
 
@@ -9,21 +10,23 @@ public class RestartWatcher
     private readonly string _assettoServerPath;
     private readonly string _restartFilter = "*.asrestart";
     private Process? CurrentProcess = null;
+    private readonly string _presetsPath;
 
     public RestartWatcher()
     {
         _basePath = Environment.CurrentDirectory;
         _restartPath = Path.Join(_basePath, "cfg", "restart");
+        _presetsPath = Path.Join(_basePath, "presets");
         _assettoServerPath = Path.Join(_basePath, "AssettoServer.exe");
 
         if (!Path.Exists(_restartPath))
             Directory.CreateDirectory(_restartPath);
-        
+        if (!Path.Exists(_presetsPath))
+            Directory.CreateDirectory(_presetsPath);
         
         // Init File Watcher
         StartWatcher(_restartPath);
-        var presetPath = Path.Join(_basePath, "presets");
-        foreach (var path in Directory.GetDirectories(presetPath))
+        foreach (var path in Directory.GetDirectories(_presetsPath))
             StartWatcher(Path.Join(path, "restart"));
     }
 
@@ -31,15 +34,14 @@ public class RestartWatcher
     {
         ConsoleLog($"Starting restart service.");
         ConsoleLog($"Base directory: {_basePath}");
-        ConsoleLog($"Restart file directory: {_restartPath}");
-        
-        foreach (string sFile in Directory.GetFiles(_restartPath, "*.asrestart"))
-        {
-            File.Delete(sFile);
-        }
 
+        var presets = Directory.GetDirectories(_presetsPath).Select(d => Path.GetFileName(d)).ToList();
+        var randomPreset = presets[Random.Shared.Next(presets.Count)];
+        
         var initPath = Path.Join(_restartPath, "init.asrestart");
         var initFile = File.Create(initPath);
+        byte[] content = new UTF8Encoding(true).GetBytes(randomPreset);
+        initFile.Write(content, 0, content.Length);
         initFile.Close();
         Thread.Sleep(2_000);
     }
@@ -69,7 +71,7 @@ public class RestartWatcher
         string preset = File.ReadAllText(e.FullPath);
 
         File.Delete(e.FullPath);
-        string args = e.Name.Equals("init.asrestart") ? "" : $"--preset=\"{preset.Trim()}\"";
+        string args = $"--preset=\"{preset.Trim()}\"";
         CurrentProcess = StartAssettoServer(_assettoServerPath, args);
         ConsoleLog($"Server restarted with Process-ID: {CurrentProcess?.Id}");
         ConsoleLog($"Using config preset: {preset}");
