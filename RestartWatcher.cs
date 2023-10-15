@@ -27,13 +27,19 @@ public class RestartWatcher
         // Init File Watcher
         StartWatcher(_restartPath);
         foreach (var path in Directory.GetDirectories(_presetsPath))
-            StartWatcher(Path.Join(path, "restart"));
+        {
+            var presetRestartPath = Path.Join(path, "restart");
+            if (!Path.Exists(presetRestartPath))
+                Directory.CreateDirectory(presetRestartPath);
+            StartWatcher(presetRestartPath);
+        }
     }
 
     public void Init()
     {
         ConsoleLog($"Starting restart service.");
         ConsoleLog($"Base directory: {_basePath}");
+        ConsoleLog($"Preset directory: {_presetsPath}");
 
         var presets = Directory.GetDirectories(_presetsPath).Select(d => Path.GetFileName(d)).ToList();
         var randomPreset = presets[Random.Shared.Next(presets.Count)];
@@ -66,15 +72,17 @@ public class RestartWatcher
             StopAssettoServer(CurrentProcess);
 
         ConsoleLog($"Restart file found: {e.Name}");
-        ConsoleLogSpacer();
 
         string preset = File.ReadAllText(e.FullPath);
 
-        File.Delete(e.FullPath);
+        ConsoleLogSpacer();
+        
         string args = $"--preset=\"{preset.Trim()}\"";
         CurrentProcess = StartAssettoServer(_assettoServerPath, args);
         ConsoleLog($"Server restarted with Process-ID: {CurrentProcess?.Id}");
         ConsoleLog($"Using config preset: {preset}");
+        
+        File.Delete(e.FullPath);
     }
 
     private Process StartAssettoServer(string assettoServerPath, string assettoServerArgs)
