@@ -68,6 +68,8 @@ public class RestartWatcher
     
     private void OnRestartFileCreated(object source, FileSystemEventArgs e)
     {
+        Thread.Sleep(500);
+        
         if (CurrentProcess != null)
             StopAssettoServer(CurrentProcess);
 
