@@ -97,6 +97,8 @@ public class RestartWatcher
     {
         while (!serverProcess.HasExited)
             serverProcess.Kill();
+        
+        Thread.Sleep(500);
     }
 
     public void StopAssettoServer()
