@@ -5,17 +5,15 @@ namespace nvrlift.AssettoServer.HostExtension;
 public class RestartWatcher
 {
     private readonly string _basePath;
-    private readonly string _restartPath;
     private readonly string _asExecutable = "";
-    private readonly string _restartFilter = "*.asrestart";
-    private Process? _currentProcess = null;
+    private Process? _currentProcess;
     private readonly string _presetsPath;
-    private List<FileSystemWatcher> _fileWatchers = new();
+    private FileSystemWatcher _fileWatcher = null!;
 
     public RestartWatcher()
     {
         _basePath = Environment.CurrentDirectory;
-        _restartPath = Path.Join(_basePath, "cfg", "restart");
+        var restartPath = Path.Join(_basePath, "cfg", "restart");
         _presetsPath = Path.Join(_basePath, "presets");
         const string assettoServerLinux = "AssettoServer.exe";
         const string assettoServerWindows = "AssettoServer";
@@ -30,8 +28,8 @@ public class RestartWatcher
 
         if (_asExecutable == "") return;
         
-        if (!Path.Exists(_restartPath))
-            Directory.CreateDirectory(_restartPath);
+        if (!Path.Exists(restartPath))
+            Directory.CreateDirectory(restartPath);
         if (!Path.Exists(_presetsPath))
             Directory.CreateDirectory(_presetsPath);
         foreach (var path in Directory.GetDirectories(_presetsPath))
@@ -41,11 +39,6 @@ public class RestartWatcher
                 Directory.CreateDirectory(presetRestartPath);
         }
         
-        Init();
-    }
-
-    private void Init()
-    {
         var randomPreset = RandomPreset();
         if (randomPreset == null)
         {
@@ -63,32 +56,10 @@ public class RestartWatcher
         ConsoleLog($"Server restarted with Process-ID: {_currentProcess?.Id}");
         ConsoleLog($"Using config preset: {randomPreset}");
         
-        StartAllWatchers();
+        _fileWatcher = StartWatcher(_basePath);
+        GC.KeepAlive(_fileWatcher);  
         
         Thread.Sleep(2_000);
-    }
-
-    private void StartAllWatchers()
-    {
-        /*
-        // I don't think i need to re-add the file watchers 
-        if (FileWatchers.Count > 0)
-        {
-            foreach (var watcher in FileWatchers)
-                watcher.Dispose();
-            FileWatchers.Clear();
-        }
-        */
-        
-        // Init File Watcher
-        _fileWatchers = new() {
-            StartWatcher(_restartPath)
-        };
-
-        foreach (var path in Directory.GetDirectories(_presetsPath))
-            _fileWatchers.Add(StartWatcher(Path.Join(path, "restart")));
-        
-        GC.KeepAlive(_fileWatchers);  
     }
     
     private FileSystemWatcher StartWatcher(string path)
@@ -96,19 +67,26 @@ public class RestartWatcher
         var watcher = new FileSystemWatcher()
         {
             Path = Path.Join(path),
-            NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
-                                                    | NotifyFilters.FileName,
-            Filter = _restartFilter,
+            NotifyFilter = NotifyFilters.DirectoryName | NotifyFilters.FileName
+                                                       | NotifyFilters.CreationTime,
+            Filter = @"*.asrestart",
+            IncludeSubdirectories = true,
         };
+        watcher.BeginInit();
+        
         watcher.Created += OnRestartFileCreated;
-
+        watcher.Error += OnError;
         watcher.EnableRaisingEvents = true;
+        
+        watcher.EndInit();
 
         return watcher;
     }
     
     private void OnRestartFileCreated(object source, FileSystemEventArgs e)
     {
+        if (!Path.GetFileName(Path.GetDirectoryName(e.FullPath))!.Equals("restart",
+                StringComparison.InvariantCultureIgnoreCase)) return;
         ConsoleLog($"Restart file found: {e.Name}");
         Thread.Sleep(500);
         
@@ -124,6 +102,46 @@ public class RestartWatcher
         ConsoleLog($"Using config preset: {preset}");
         
         File.Delete(e.FullPath);
+    }
+    
+    private void OnError(object source, ErrorEventArgs e)
+    {
+        ConsoleLog(e.GetException().GetType() == typeof(InternalBufferOverflowException)
+            ? $"Restart listener internal overflow."
+            : $"Directory inaccessible.");
+        NotAccessibleError(_fileWatcher ,e);
+    }
+    
+    void NotAccessibleError(FileSystemWatcher source, ErrorEventArgs e)
+    {
+        int i = 0;
+        while ((!Directory.Exists(source.Path) || source.EnableRaisingEvents == false) && i < 120)
+        {
+            i += 1;
+            try
+            {
+                source.EnableRaisingEvents = false;
+                if (!Directory.Exists(source.Path))
+                {
+                    ConsoleLog($"Directory inaccessible: {source.Path}.");
+                    Thread.Sleep(30_000);
+                }
+                else
+                {
+                    var path = source.Path;
+                    // ReInitialize the Component
+                    source.Dispose();
+                    source = StartWatcher(path);
+                    ConsoleLog($"Try to restart Restart-Listener.");
+                }
+            }
+            catch (Exception error)
+            {
+                ConsoleLog($"Error trying restart Restart-Listener {error.StackTrace}");
+                source.EnableRaisingEvents = false;
+                Thread.Sleep(5_000);
+            }
+        }
     }
 
     private Process StartAssettoServer(string? preset = null)

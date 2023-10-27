@@ -4,10 +4,10 @@ internal static class Program
 {
     private static void Main()
     {
+        Console.WriteLine("Press any key to close this application.");
         RestartWatcher watcher = new();
         AppDomain.CurrentDomain.ProcessExit += (sender, e) => ProcessExit(sender, e, watcher);
 
-        Console.WriteLine("Press any key to close this application.");
         Console.ReadKey();
     }
 
