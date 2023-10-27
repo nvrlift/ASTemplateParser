@@ -5,20 +5,15 @@ internal static class Program
     private static void Main()
     {
         RestartWatcher watcher = new();
-        AppDomain.CurrentDomain.ProcessExit += new EventHandler((sender, e) => ProcessExit(sender, e, watcher));
+        AppDomain.CurrentDomain.ProcessExit += (sender, e) => ProcessExit(sender, e, watcher);
 
-        watcher.Init();
-
-        Console.WriteLine("Type 'lift' to close this application.");
-        string cancelInput;
-        do
-        {
-            cancelInput = Console.ReadLine() ?? "";
-        } while (cancelInput != "lift");
+        Console.WriteLine("Press any key to close this application.");
+        Console.ReadKey();
     }
 
-    private static void ProcessExit(object sender, EventArgs e, RestartWatcher watcher)
+    private static void ProcessExit(object? sender, EventArgs e, RestartWatcher watcher)
     {
-        watcher.StopAssettoServer();
+        
+        watcher.Exit();
     }
 }
