@@ -178,6 +178,7 @@ public class RestartWatcher
             // WorkingDirectory = _basePath,
             
             UseShellExecute = false,
+            CreateNoWindow = true,
 
             RedirectStandardError = true,
             RedirectStandardInput = true,
