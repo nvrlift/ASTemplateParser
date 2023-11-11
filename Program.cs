@@ -17,14 +17,11 @@ internal static class Program
         [Option('d',"use-docker", Required = false, SetName = "AssettoServer", HelpText = "Used mainly for docker; Additionally load plugins from working directory")]
         public bool UseDocker { get; set; } = false;
         
-        [Option('s',"skip-preset-load", Required = false, HelpText = "If not set will load preset templates with the config file.")]
-        public bool SkipPresetLoader { get; set; } = false;
-        
-        [Option('e',"use-env-vars", Required = false, HelpText = "Use environment variables instead of a config file (override_cfg.json).")]
+        [Option('e',"use-env-vars", Required = false, HelpText = "Use environment variables instead of a config file (templates/template_cfg.json).")]
         public bool UseEnvironmentVariables { get; set; } = false;
         
-        [Option('t',"template-folder", Required = false, HelpText = "Use different folder for templates, default is 'templates'.")]
-        public string TemplateFolder { get; set; } = "templates";
+        [Option('t',"template-folder", Required = false, HelpText = "Use templates to create plugins from environment variables.")]
+        public string TemplateFolder { get; set; } = "";
     }
     private static async Task Main(string[] args)
     {
@@ -44,11 +41,12 @@ internal static class Program
             .WriteTo.File($"logs/restarter-.txt", rollingInterval: RollingInterval.Day)
             .CreateLogger();
 
-        if (!options.SkipPresetLoader)
+        if (options.TemplateFolder != "" && Path.Exists(options.TemplateFolder))
         {
             Log.Information($"Loading presets.");
-        
-            PresetLoader loader = new(basePath, options.TemplateFolder, options.UseEnvironmentVariables);
+
+            using PresetLoader loader = new(options.TemplateFolder, options.UseEnvironmentVariables);
+            loader.Load();
         }
         else
             Log.Information($"Preset loader skipped.");

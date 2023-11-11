@@ -15,11 +15,8 @@ public class RestartWatcher
     private readonly bool _useDocker;
     private bool _exit = false;
 
-    private Thread? _outputThread;
-    private Thread? _errorThread;
-    private Thread? _inputThread;
-    
-    
+    private CancellationTokenSource _cancellationTokenSource = new();
+   
     public RestartWatcher(string basePath, string startPreset, bool useDocker)
     {
         // Init Paths
@@ -35,9 +32,9 @@ public class RestartWatcher
         
         
         if (File.Exists(Path.Join(_basePath, AssettoServerLinux)))
-            _asExecutable = AssettoServerLinux;
+            _asExecutable = Path.Join(_basePath, AssettoServerLinux);
         else if (File.Exists(Path.Join(_basePath, AssettoServerWindows)))
-            _asExecutable = AssettoServerWindows;
+            _asExecutable = Path.Join(_basePath, AssettoServerWindows);
         else
             Log.Information($"AssettoServer not found.");
 
@@ -53,7 +50,6 @@ public class RestartWatcher
             if (!Path.Exists(presetRestartPath))
                 Directory.CreateDirectory(presetRestartPath);
         }
-        
     }
 
     public async Task RunAsync()
@@ -168,14 +164,16 @@ public class RestartWatcher
     {
         string args = preset != null ? $"--preset=\"{preset.Trim()}\"" : "";
         if (_useDocker)
-            args += " -plugins-from-workdir";
+            args += " --plugins-from-workdir";
         args = args.Trim();
         
         var psi = new ProcessStartInfo()
         {
             FileName = _asExecutable,
             Arguments = args,
-            // WorkingDirectory = _basePath,
+#if (DEBUG)            
+            WorkingDirectory = _basePath,
+#endif            
             
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -185,17 +183,19 @@ public class RestartWatcher
             RedirectStandardOutput = true
         };
 
-        Process asProcess = new Process();
+        Process asProcess = new();
         asProcess.StartInfo = psi;
         asProcess.Start();
 
-        // Start the IO threads
-        _outputThread = new Thread(OutputReader) { Name = "AssettoServerIO Output", Priority = ThreadPriority.Highest, IsBackground = true };
-        _errorThread = new Thread(ErrorReader) { Name = "AssettoServerIO Error", Priority = ThreadPriority.Highest, IsBackground = true };
-        _inputThread = new Thread(InputReader) { Name = "AssettoServerIO Input", Priority = ThreadPriority.Highest, IsBackground = true };
-        _outputThread.Start(asProcess);
-        _errorThread.Start(asProcess);
-        _inputThread.Start(asProcess);
+        // Start the IO passthrough
+        if (!_cancellationTokenSource.IsCancellationRequested)
+            _cancellationTokenSource.Cancel();
+
+        _cancellationTokenSource = new CancellationTokenSource();
+            
+        OutputReader(asProcess);
+        ErrorReader(asProcess);
+        InputReader(asProcess);
         
         Log.Information($"Server restarted with Process-ID: {asProcess.Id}");
         Log.Information($"Using config preset: {preset}");
@@ -205,9 +205,9 @@ public class RestartWatcher
 
     private void StopAssettoServer(Process serverProcess)
     {
-        _outputThread = null; 
-        _errorThread = null;
-        _inputThread = null;
+        if (!_cancellationTokenSource.IsCancellationRequested)
+            _cancellationTokenSource.Cancel();
+        
         while (!serverProcess.HasExited)
         {
             serverProcess.Kill();
@@ -243,37 +243,32 @@ public class RestartWatcher
     /// </summary>
     /// <param name="inStream">The input stream.</param>
     /// <param name="outStream">The output stream.</param>
-    private static void PassThrough(Stream inStream, Stream outStream)
+    private void PassThrough(Stream inStream, Stream outStream)
     {
-        byte[] buffer = new byte[4096];
-        while (true)
+        var task = new Task(() =>
         {
-            int len;
-            while ((len = inStream.Read(buffer, 0, buffer.Length)) > 0)
-            {
-                outStream.Write(buffer, 0, len);
-                outStream.Flush();
-            }
-        }
+            inStream.CopyToAsync(outStream);
+        }, _cancellationTokenSource.Token);
+        task.Start();
     }
 
-    private static void OutputReader(object p)
+    private void OutputReader(Process p)
     {
-        var process = (Process)p;
+        var process = p;
         // Pass the standard output of the child to our standard output
         PassThrough(process.StandardOutput.BaseStream, Console.OpenStandardOutput());
     }
 
-    private static void ErrorReader(object p)
+    private void ErrorReader(Process p)
     {
-        var process = (Process)p;
+        var process = p;
         // Pass the standard error of the child to our standard error
         PassThrough(process.StandardError.BaseStream, Console.OpenStandardError());
     }
 
-    private static void InputReader(object p)
+    private void InputReader(Process p)
     {
-        var process = (Process)p;
+        var process = p;
         // Pass our standard input into the standard input of the child
         PassThrough(Console.OpenStandardInput(), process.StandardInput.BaseStream);
     }
