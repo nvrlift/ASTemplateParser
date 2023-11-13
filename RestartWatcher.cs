@@ -13,11 +13,10 @@ public class RestartWatcher
     private readonly string _presetsPath;
     private FileSystemWatcher _fileWatcher = null!;
     private readonly bool _useDocker;
+    private readonly bool _debug;
     private bool _exit = false;
-
-    private CancellationTokenSource _cancellationTokenSource = new();
    
-    public RestartWatcher(string basePath, string startPreset, bool useDocker)
+    public RestartWatcher(string basePath, string startPreset, bool useDocker, bool debug)
     {
         // Init Paths
         _basePath = basePath;
@@ -26,7 +25,8 @@ public class RestartWatcher
         
         // Runtime options
         _useDocker = useDocker;
-        if (startPreset != "")
+        _debug = debug;
+        if (!string.IsNullOrEmpty(startPreset))
             if (Path.Exists(Path.Join(_presetsPath, startPreset)))
                 _startPreset = startPreset;
         
@@ -55,7 +55,7 @@ public class RestartWatcher
     public async Task RunAsync()
     {
         string preset = _startPreset;
-        if (preset == "")
+        if (string.IsNullOrEmpty(preset))
         {
             var randomPreset = RandomPreset();
             if (randomPreset == null)
@@ -167,6 +167,10 @@ public class RestartWatcher
             args += " --plugins-from-workdir";
         args = args.Trim();
         
+        
+        if (_debug)
+            Log.Debug(args);
+        
         var psi = new ProcessStartInfo()
         {
             FileName = _asExecutable,
@@ -186,16 +190,6 @@ public class RestartWatcher
         Process asProcess = new();
         asProcess.StartInfo = psi;
         asProcess.Start();
-
-        // Start the IO passthrough
-        if (!_cancellationTokenSource.IsCancellationRequested)
-            _cancellationTokenSource.Cancel();
-
-        _cancellationTokenSource = new CancellationTokenSource();
-            
-        OutputReader(asProcess);
-        ErrorReader(asProcess);
-        InputReader(asProcess);
         
         Log.Information($"Server restarted with Process-ID: {asProcess.Id}");
         Log.Information($"Using config preset: {preset}");
@@ -205,9 +199,6 @@ public class RestartWatcher
 
     private void StopAssettoServer(Process serverProcess)
     {
-        if (!_cancellationTokenSource.IsCancellationRequested)
-            _cancellationTokenSource.Cancel();
-        
         while (!serverProcess.HasExited)
         {
             serverProcess.Kill();
@@ -232,44 +223,5 @@ public class RestartWatcher
         var presets = directories.Select(Path.GetFileName).ToList();
         var randomPreset = presets[Random.Shared.Next(presets.Count)];
         return randomPreset;
-    }
-    
-    
-    // MORE Process Handling
-    
-    /// https://stackoverflow.com/a/30517342
-    /// <summary>
-    /// Continuously copies data from one stream to the other.
-    /// </summary>
-    /// <param name="inStream">The input stream.</param>
-    /// <param name="outStream">The output stream.</param>
-    private void PassThrough(Stream inStream, Stream outStream)
-    {
-        var task = new Task(() =>
-        {
-            inStream.CopyToAsync(outStream);
-        }, _cancellationTokenSource.Token);
-        task.Start();
-    }
-
-    private void OutputReader(Process p)
-    {
-        var process = p;
-        // Pass the standard output of the child to our standard output
-        PassThrough(process.StandardOutput.BaseStream, Console.OpenStandardOutput());
-    }
-
-    private void ErrorReader(Process p)
-    {
-        var process = p;
-        // Pass the standard error of the child to our standard error
-        PassThrough(process.StandardError.BaseStream, Console.OpenStandardError());
-    }
-
-    private void InputReader(Process p)
-    {
-        var process = p;
-        // Pass our standard input into the standard input of the child
-        PassThrough(Console.OpenStandardInput(), process.StandardInput.BaseStream);
     }
 }

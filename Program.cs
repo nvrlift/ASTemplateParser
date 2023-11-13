@@ -1,4 +1,5 @@
-﻿using JetBrains.Annotations;
+﻿using System.Text.Json;
+using JetBrains.Annotations;
 using CommandLine;
 using Serilog;
 using Serilog.Events;
@@ -20,13 +21,18 @@ internal static class Program
         [Option('e',"use-env-vars", Required = false, HelpText = "Use environment variables instead of a config file (templates/template_cfg.json).")]
         public bool UseEnvironmentVariables { get; set; } = false;
         
-        [Option('t',"template-folder", Required = false, HelpText = "Use templates to create plugins from environment variables.")]
-        public string TemplateFolder { get; set; } = "";
+        [Option('t',"use-template", Required = false, HelpText = "Use templates to create plugins from (environment) variables.")]
+        public bool UseTemplate { get; set; } = false;
+        
+        [Option("debug", Required = false, HelpText = "Debug output.")]
+        public bool Debug { get; set; } = false;
     }
     private static async Task Main(string[] args)
     {
         var options = Parser.Default.ParseArguments<Options>(args).Value;
         if (options == null) return;
+        if (options.Preset.StartsWith('='))
+            options.Preset = options.Preset[1..];
         
         var basePath = Environment.CurrentDirectory;
         
@@ -40,12 +46,15 @@ internal static class Program
             .WriteTo.Console(theme: SystemConsoleTheme.Literate, applyThemeToRedirectedOutput: true)
             .WriteTo.File($"logs/restarter-.txt", rollingInterval: RollingInterval.Day)
             .CreateLogger();
-
-        if (options.TemplateFolder != "" && Path.Exists(options.TemplateFolder))
+        
+        if (options.Debug)
+            Log.Debug(JsonSerializer.Serialize(options));
+        
+        if (options.UseTemplate)
         {
             Log.Information($"Loading presets.");
 
-            using PresetLoader loader = new(options.TemplateFolder, options.UseEnvironmentVariables);
+            using TemplateLoader loader = new(basePath, options.UseEnvironmentVariables);
             loader.Load();
         }
         else
@@ -53,7 +62,7 @@ internal static class Program
         
         Log.Information($"Starting restart service.");
         
-        RestartWatcher watcher = new(basePath, options.Preset, options.UseDocker);
+        RestartWatcher watcher = new(basePath, options.Preset, options.UseDocker, options.Debug);
         AppDomain.CurrentDomain.ProcessExit += (sender, e) => ProcessExit(sender, e, watcher);
         AppDomain.CurrentDomain.UnhandledException += (sender, e) => OnUnhandledException(sender, e, watcher);
 
