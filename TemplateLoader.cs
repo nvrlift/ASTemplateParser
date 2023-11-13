@@ -10,11 +10,13 @@ public class TemplateLoader : IDisposable
     private Dictionary<string, string>? _config;
     private readonly string _templatePath;
     private readonly bool _useEnvVar;
+    private readonly bool _deleteOldPresets;
     private readonly string _presetPath;
     
-    public TemplateLoader(string basePath, bool useEnvVar)
+    public TemplateLoader(string basePath, bool useEnvVar, bool deleteOldPresets)
     {
         _useEnvVar = useEnvVar;
+        _deleteOldPresets = deleteOldPresets;
         _presetPath = Path.Join(basePath, "presets");
         _templatePath = Path.Join(basePath, "templates");
     }
@@ -23,7 +25,17 @@ public class TemplateLoader : IDisposable
     {
         if (Path.Exists(_presetPath))
         {
-            Directory.Move(_presetPath, $"{_presetPath}{DateTime.Now:yyyyMMdd-HHmmss}");
+            try
+            {
+                if (_deleteOldPresets)
+                    Directory.Delete(_presetPath, true);
+                else
+                    Directory.Move(_presetPath, $"{_presetPath}{DateTime.Now:yyyyMMdd-HHmmss}");
+            }
+            catch
+            {
+                Log.Error($"Unable to move/delete old presets folder.");
+            }
         }
 
         if (!Path.Exists(_templatePath))

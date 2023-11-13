@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Runtime.InteropServices;
+using System.Text.Json;
 using JetBrains.Annotations;
 using CommandLine;
 using Serilog;
@@ -24,9 +25,19 @@ internal static class Program
         [Option('t',"use-template", Required = false, HelpText = "Use templates to create plugins from (environment) variables.")]
         public bool UseTemplate { get; set; } = false;
         
+        
+        [Option("delete-old-presets", Required = false, HelpText = "Should old presets be deleted instead of moved for backup.")]
+        public bool DeleteOldPresets { get; set; } = false;
+        
         [Option("debug", Required = false, HelpText = "Debug output.")]
         public bool Debug { get; set; } = false;
     }
+    
+    private static ConsoleEventDelegate? _handler;
+    private delegate bool ConsoleEventDelegate(int eventType);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetConsoleCtrlHandler(ConsoleEventDelegate? callback, bool add);
+
     private static async Task Main(string[] args)
     {
         var options = Parser.Default.ParseArguments<Options>(args).Value;
@@ -54,7 +65,7 @@ internal static class Program
         {
             Log.Information($"Loading presets.");
 
-            using TemplateLoader loader = new(basePath, options.UseEnvironmentVariables);
+            using TemplateLoader loader = new(basePath, options.UseEnvironmentVariables, options.DeleteOldPresets);
             loader.Load();
         }
         else
@@ -63,23 +74,36 @@ internal static class Program
         Log.Information($"Starting restart service.");
         
         RestartWatcher watcher = new(basePath, options.Preset, options.UseDocker, options.Debug);
-        AppDomain.CurrentDomain.ProcessExit += (sender, e) => ProcessExit(sender, e, watcher);
-        AppDomain.CurrentDomain.UnhandledException += (sender, e) => OnUnhandledException(sender, e, watcher);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => ExitProcess(watcher);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => OnUnhandledException(e, watcher);
 
+        // Please close server on ctrl+c
+        Console.CancelKeyPress += delegate
+        {
+            CancelProcess(watcher);
+        };
+        _handler = _ => CancelProcess(watcher);
+        SetConsoleCtrlHandler(_handler, true);
+        
         await watcher.RunAsync();
     }
 
-    private static void ProcessExit(object? sender, EventArgs e, RestartWatcher watcher)
+    private static void ExitProcess(RestartWatcher watcher)
     {
         Log.CloseAndFlush();
         watcher.Exit();
     }
 
-    private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs args, RestartWatcher watcher)
+    private static void OnUnhandledException(UnhandledExceptionEventArgs args, RestartWatcher watcher)
     {
         Log.Fatal((Exception)args.ExceptionObject, "Unhandled exception occurred");
-        Log.CloseAndFlush();
-        watcher.Exit();
+        ExitProcess(watcher);
         Environment.Exit(1);
+    }
+
+    private static bool CancelProcess(RestartWatcher watcher)
+    {
+        ExitProcess(watcher);
+        return false;
     }
 }

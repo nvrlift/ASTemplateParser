@@ -4,7 +4,7 @@ using static nvrlift.AssettoServer.HostExtension.Const;
 
 namespace nvrlift.AssettoServer.HostExtension;
 
-public class RestartWatcher
+public class RestartWatcher : IDisposable
 {
     private readonly string _basePath;
     private readonly string _startPreset = "";
@@ -75,7 +75,7 @@ public class RestartWatcher
         await Task.Delay(1_000);
         
         _fileWatcher = StartWatcher(_basePath);
-        GC.KeepAlive(_fileWatcher);  
+        // GC.KeepAlive(_fileWatcher);  
         while (!_exit)
             await Task.Delay(2_000);
     }
@@ -223,5 +223,10 @@ public class RestartWatcher
         var presets = directories.Select(Path.GetFileName).ToList();
         var randomPreset = presets[Random.Shared.Next(presets.Count)];
         return randomPreset;
+    }
+
+    public void Dispose()
+    {
+        Exit();
     }
 }
