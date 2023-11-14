@@ -33,11 +33,6 @@ internal static class Program
         public bool Debug { get; set; } = false;
     }
     
-    private static ConsoleEventDelegate? _handler;
-    private delegate bool ConsoleEventDelegate(int eventType);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool SetConsoleCtrlHandler(ConsoleEventDelegate? callback, bool add);
-
     private static async Task Main(string[] args)
     {
         var options = Parser.Default.ParseArguments<Options>(args).Value;
@@ -76,14 +71,7 @@ internal static class Program
         RestartWatcher watcher = new(basePath, options.Preset, options.UseDocker, options.Debug);
         AppDomain.CurrentDomain.ProcessExit += (_, _) => ExitProcess(watcher);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => OnUnhandledException(e, watcher);
-
-        // Please close server on ctrl+c
-        Console.CancelKeyPress += delegate
-        {
-            CancelProcess(watcher);
-        };
-        _handler = _ => CancelProcess(watcher);
-        SetConsoleCtrlHandler(_handler, true);
+        Console.CancelKeyPress += (_, _) => ExitProcess(watcher);
         
         await watcher.RunAsync();
     }
@@ -99,11 +87,5 @@ internal static class Program
         Log.Fatal((Exception)args.ExceptionObject, "Unhandled exception occurred");
         ExitProcess(watcher);
         Environment.Exit(1);
-    }
-
-    private static bool CancelProcess(RestartWatcher watcher)
-    {
-        ExitProcess(watcher);
-        return false;
     }
 }
