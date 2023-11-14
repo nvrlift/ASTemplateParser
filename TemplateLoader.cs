@@ -54,9 +54,9 @@ public class TemplateLoader : IDisposable
         var json = File.ReadAllText(cfgPath);
         _config = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
 
-        Log.Information($"Starting to copy templates/ into presets/");
+        Log.Information($"Starting to copy '{_templatePath}' into '{_presetPath}'...");
         CopyFilesRecursively(new DirectoryInfo(_templatePath), new DirectoryInfo(_presetPath));
-        Log.Information($"Copying templates finished.");
+        Log.Information($"Generating presets with templates finished.");
     }
 
     private void CopyFilesRecursively(DirectoryInfo source, DirectoryInfo target) {

@@ -29,14 +29,17 @@ public class RestartWatcher : IDisposable
         if (!string.IsNullOrEmpty(startPreset))
             if (Path.Exists(Path.Join(_presetsPath, startPreset)))
                 _startPreset = startPreset;
+
+        var appPath = _useDocker ? "/app" : _basePath;
+        if (_debug)
+            Log.Information($"App path: {appPath}");
         
-        
-        if (File.Exists(Path.Join(_basePath, AssettoServerLinux)))
-            _asExecutable = Path.Join(_basePath, AssettoServerLinux);
-        else if (File.Exists(Path.Join(_basePath, AssettoServerWindows)))
-            _asExecutable = Path.Join(_basePath, AssettoServerWindows);
+        if (File.Exists(Path.Join(appPath, AssettoServerLinux)))
+            _asExecutable = Path.Join(appPath, AssettoServerLinux);
+        else if (File.Exists(Path.Join(appPath, AssettoServerWindows)))
+            _asExecutable = Path.Join(appPath, AssettoServerWindows);
         else
-            Log.Information($"AssettoServer not found.");
+            Log.Information($"AssettoServer not found at '{appPath}'.");
 
         if (_asExecutable == "") return;
         
@@ -166,10 +169,13 @@ public class RestartWatcher : IDisposable
         if (_useDocker)
             args += " --plugins-from-workdir";
         args = args.Trim();
-        
-        
+
+
         if (_debug)
-            Log.Debug(args);
+        {
+            Log.Debug($"Executable: {_asExecutable}");
+            Log.Debug($"Arguments:  {args}");
+        }
         
         var psi = new ProcessStartInfo()
         {
@@ -186,7 +192,7 @@ public class RestartWatcher : IDisposable
             RedirectStandardInput = true,
             RedirectStandardOutput = true
         };
-
+        
         Process asProcess = new();
         asProcess.StartInfo = psi;
         asProcess.Start();
