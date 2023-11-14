@@ -10,13 +10,15 @@
         <Company>nvrlift</Company>
         <Product>AssettoServer.HostExtension</Product>
         <ApplicationIcon>Assets\nvrlift.ico</ApplicationIcon>
+        <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64</RuntimeIdentifiers>
+        <PublishSingleFile Condition="'$(NO_SINGLE_FILE)' != '1'">true</PublishSingleFile>
+        <DebugType>embedded</DebugType>
+        <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
+        <PublishDir Condition="'$(RuntimeIdentifier)' == 'linux-x64'">..\out-linux-x64\</PublishDir>
+        <PublishDir Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">..\out-linux-arm64\</PublishDir>
+        <PublishDir Condition="'$(RuntimeIdentifier)' == 'win-x64'">..\out-win-x64\</PublishDir>
     </PropertyGroup>
-
-    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-      <PlatformTarget>x64</PlatformTarget>
-      <DebugType>embedded</DebugType>
-    </PropertyGroup>
-
+    
     <ItemGroup>
       <PackageReference Include="Autofac" Version="7.1.0" />
       <PackageReference Include="CommandLineParser" Version="2.9.1" />
