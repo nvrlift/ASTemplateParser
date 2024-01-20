@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Serilog;
 
-namespace nvrlift.AssettoServer.HostExtension;
+namespace nvrlift.AssettoServer.TemplateParser;
 
 public class TemplateLoader : IDisposable
 {

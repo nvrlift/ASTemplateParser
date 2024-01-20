@@ -5,7 +5,7 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <AssemblyName>AS-Restarter</AssemblyName>
+        <AssemblyName>ASTemplateParser</AssemblyName>
         <Authors>thisguyStan</Authors>
         <Company>nvrlift</Company>
         <Product>AssettoServer.HostExtension</Product>
@@ -14,9 +14,10 @@
         <PublishSingleFile Condition="'$(NO_SINGLE_FILE)' != '1'">true</PublishSingleFile>
         <DebugType>embedded</DebugType>
         <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
-        <PublishDir Condition="'$(RuntimeIdentifier)' == 'linux-x64'">..\out-linux-x64\</PublishDir>
-        <PublishDir Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">..\out-linux-arm64\</PublishDir>
-        <PublishDir Condition="'$(RuntimeIdentifier)' == 'win-x64'">..\out-win-x64\</PublishDir>
+        <PublishDir Condition="'$(RuntimeIdentifier)' == 'linux-x64'">.\out-linux-x64\</PublishDir>
+        <PublishDir Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">.\out-linux-arm64\</PublishDir>
+        <PublishDir Condition="'$(RuntimeIdentifier)' == 'win-x64'">.\out-win-x64\</PublishDir>
+        <RootNamespace>nvrlift.AssettoServer.TemplateParser</RootNamespace>
     </PropertyGroup>
     
     <ItemGroup>
