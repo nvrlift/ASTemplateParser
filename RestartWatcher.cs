@@ -1,30 +1,45 @@
 using System.Diagnostics;
+using Serilog;
+using static nvrlift.AssettoServer.HostExtension.Const;
 
 namespace nvrlift.AssettoServer.HostExtension;
 
-public class RestartWatcher
+public class RestartWatcher : IDisposable
 {
     private readonly string _basePath;
+    private readonly string _startPreset = "";
     private readonly string _asExecutable = "";
     private Process? _currentProcess;
     private readonly string _presetsPath;
     private FileSystemWatcher _fileWatcher = null!;
-
-    public RestartWatcher()
+    private readonly bool _useDocker;
+    private readonly bool _debug;
+    private bool _exit = false;
+   
+    public RestartWatcher(string basePath, string startPreset, bool useDocker, bool debug)
     {
-        _basePath = Environment.CurrentDirectory;
-        var restartPath = Path.Join(_basePath, "cfg", "restart");
+        // Init Paths
+        _basePath = basePath;
         _presetsPath = Path.Join(_basePath, "presets");
-        const string assettoServerLinux = "AssettoServer.exe";
-        const string assettoServerWindows = "AssettoServer";
-        if (File.Exists(Path.Join(_basePath, assettoServerLinux)))
-            _asExecutable = assettoServerLinux;
-        else if (File.Exists(Path.Join(_basePath, assettoServerWindows)))
-            _asExecutable = assettoServerWindows;
+        var restartPath = Path.Join(_basePath, "cfg", "restart");
+        
+        // Runtime options
+        _useDocker = useDocker;
+        _debug = debug;
+        if (!string.IsNullOrEmpty(startPreset))
+            if (Path.Exists(Path.Join(_presetsPath, startPreset)))
+                _startPreset = startPreset;
+
+        var appPath = _useDocker ? "/app" : _basePath;
+        if (_debug)
+            Log.Information($"App path: {appPath}");
+        
+        if (File.Exists(Path.Join(appPath, AssettoServerLinux)))
+            _asExecutable = Path.Join(appPath, AssettoServerLinux);
+        else if (File.Exists(Path.Join(appPath, AssettoServerWindows)))
+            _asExecutable = Path.Join(appPath, AssettoServerWindows);
         else
-        {
-            ConsoleLog($"AssettoServer not found.");
-        }
+            Log.Information($"AssettoServer not found at '{appPath}'.");
 
         if (_asExecutable == "") return;
         
@@ -38,28 +53,34 @@ public class RestartWatcher
             if (!Path.Exists(presetRestartPath))
                 Directory.CreateDirectory(presetRestartPath);
         }
-        
-        var randomPreset = RandomPreset();
-        if (randomPreset == null)
+    }
+
+    public async Task RunAsync()
+    {
+        string preset = _startPreset;
+        if (string.IsNullOrEmpty(preset))
         {
-            ConsoleLog($"No preset found.");
+            var randomPreset = RandomPreset();
+            if (randomPreset == null)
+            {
+                Log.Error($"No preset found.");
 
-            return;
+                return;
+            }
+
+            preset = randomPreset;
         }
-        ConsoleLog($"Starting restart service.");
-        ConsoleLog($"Base directory: {_basePath}");
-        ConsoleLog($"Preset directory: {_presetsPath}");
-
-        _currentProcess = StartAssettoServer(randomPreset);
-        Thread.Sleep(1_000);
         
-        ConsoleLog($"Server restarted with Process-ID: {_currentProcess?.Id}");
-        ConsoleLog($"Using config preset: {randomPreset}");
+        Log.Information($"Base directory: {_basePath}");
+        Log.Information($"Preset directory: {_presetsPath}");
+
+        _currentProcess = StartAssettoServer(preset);
+        await Task.Delay(1_000);
         
         _fileWatcher = StartWatcher(_basePath);
-        GC.KeepAlive(_fileWatcher);  
-        
-        Thread.Sleep(2_000);
+        // GC.KeepAlive(_fileWatcher);  
+        while (!_exit)
+            await Task.Delay(2_000);
     }
     
     private FileSystemWatcher StartWatcher(string path)
@@ -87,7 +108,7 @@ public class RestartWatcher
     {
         if (!Path.GetFileName(Path.GetDirectoryName(e.FullPath))!.Equals("restart",
                 StringComparison.InvariantCultureIgnoreCase)) return;
-        ConsoleLog($"Restart file found: {e.Name}");
+        Log.Information($"Restart file found: {e.Name}");
         Thread.Sleep(500);
         
         if (_currentProcess != null)
@@ -95,26 +116,24 @@ public class RestartWatcher
 
         var preset = File.ReadAllText(e.FullPath);
 
-        ConsoleLogSpacer();
+        Log.Information(Separator);
         
         _currentProcess = StartAssettoServer(preset);
-        ConsoleLog($"Server restarted with Process-ID: {_currentProcess?.Id}");
-        ConsoleLog($"Using config preset: {preset}");
         
         File.Delete(e.FullPath);
     }
     
     private void OnError(object source, ErrorEventArgs e)
     {
-        ConsoleLog(e.GetException().GetType() == typeof(InternalBufferOverflowException)
+        Log.Error(e.GetException().GetType() == typeof(InternalBufferOverflowException)
             ? $"Restart listener internal overflow."
             : $"Directory inaccessible.");
         NotAccessibleError(_fileWatcher ,e);
     }
-    
-    void NotAccessibleError(FileSystemWatcher source, ErrorEventArgs e)
+
+    private void NotAccessibleError(FileSystemWatcher source, ErrorEventArgs e)
     {
-        int i = 0;
+        var i = 0;
         while ((!Directory.Exists(source.Path) || source.EnableRaisingEvents == false) && i < 120)
         {
             i += 1;
@@ -123,7 +142,7 @@ public class RestartWatcher
                 source.EnableRaisingEvents = false;
                 if (!Directory.Exists(source.Path))
                 {
-                    ConsoleLog($"Directory inaccessible: {source.Path}.");
+                    Log.Error($"Directory inaccessible: {source.Path}.");
                     Thread.Sleep(30_000);
                 }
                 else
@@ -132,12 +151,12 @@ public class RestartWatcher
                     // ReInitialize the Component
                     source.Dispose();
                     source = StartWatcher(path);
-                    ConsoleLog($"Try to restart Restart-Listener.");
+                    Log.Warning($"Try to restart Restart-Listener.");
                 }
             }
             catch (Exception error)
             {
-                ConsoleLog($"Error trying restart Restart-Listener {error.StackTrace}");
+                Log.Error($"Error trying restart Restart-Listener {error.StackTrace}");
                 source.EnableRaisingEvents = false;
                 Thread.Sleep(5_000);
             }
@@ -147,19 +166,39 @@ public class RestartWatcher
     private Process StartAssettoServer(string? preset = null)
     {
         string args = preset != null ? $"--preset=\"{preset.Trim()}\"" : "";
-        
-        var psi = new ProcessStartInfo(_asExecutable)
-        {
-            UseShellExecute = true,
-            WindowStyle = ProcessWindowStyle.Hidden,
-            Arguments = args,
-            WorkingDirectory = _basePath,
-            CreateNoWindow = true
-        };
+        if (_useDocker)
+            args += " --plugins-from-workdir";
+        args = args.Trim();
 
-        Process asProcess = new Process();
+
+        if (_debug)
+        {
+            Log.Debug($"Executable: {_asExecutable}");
+            Log.Debug($"Arguments:  {args}");
+        }
+        
+        var psi = new ProcessStartInfo()
+        {
+            FileName = _asExecutable,
+            Arguments = args,
+#if (DEBUG)            
+            WorkingDirectory = _basePath,
+#endif            
+            
+            UseShellExecute = false,
+            CreateNoWindow = true,
+
+            RedirectStandardError = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true
+        };
+        
+        Process asProcess = new();
         asProcess.StartInfo = psi;
         asProcess.Start();
+        
+        Log.Information($"Server restarted with Process-ID: {asProcess.Id}");
+        Log.Information($"Using config preset: {preset}");
         
         return asProcess;
     }
@@ -175,9 +214,10 @@ public class RestartWatcher
 
     public void Exit()
     {
-        ConsoleLog($"Exiting AssettoServer");
-        StopAssettoServer(_currentProcess!);
-        ConsoleLog($"Exiting AS-Restarter");
+        Log.Information($"Exiting AssettoServer");
+        if (_currentProcess != null)
+            StopAssettoServer(_currentProcess);
+        Log.Information($"Exiting AS-Restarter");
         Thread.Sleep(500);
     }
 
@@ -186,25 +226,13 @@ public class RestartWatcher
         var directories = Directory.GetDirectories(_presetsPath);
         if (directories.Length == 0)
             return null;
-        var presets = directories.Select(f => Path.GetFileName(f)).ToList();
+        var presets = directories.Select(Path.GetFileName).ToList();
         var randomPreset = presets[Random.Shared.Next(presets.Count)];
         return randomPreset;
     }
 
-    private string ConsoleLogTime()
+    public void Dispose()
     {
-        var date = DateTime.Now;
-        return $"[{date:yyyy-MM-dd hh:mm:ss}]";
-    }
-
-    private void ConsoleLogSpacer()
-    {
-        Console.WriteLine("-----");
-    }
-    
-    private void ConsoleLog(string log)
-    {
-        var output = $"{ConsoleLogTime()} {log}";
-        Console.WriteLine(output);
+        Exit();
     }
 }
